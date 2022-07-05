@@ -10,7 +10,8 @@ contract FlightSuretyData {
     /********************************************************************************************/
 
     address private contractOwner;                                      // Account used to deploy contract
-    bool private operational = true;                                    // Blocks all state changes throughout the contract if false
+    bool private operational = true;
+    mapping(address => bool) private authorizedCaller;                                    // Blocks all state changes throughout the contract if false
 
     /********************************************************************************************/
     /*                                       EVENT DEFINITIONS                                  */
@@ -27,6 +28,7 @@ contract FlightSuretyData {
                                 public 
     {
         contractOwner = msg.sender;
+        authorizedCaller[contractOwner] = true;
     }
 
     /********************************************************************************************/
@@ -53,6 +55,15 @@ contract FlightSuretyData {
     modifier requireContractOwner()
     {
         require(msg.sender == contractOwner, "Caller is not contract owner");
+        _;
+    }
+
+    /**
+    * @dev Modifier that requires the "requireCallerAuthorized" account to be the function caller
+    */
+    modifier requireCallerAuthorized()
+    {
+        require(authorizedCaller[msg.sender]==true, "Caller is not authorized");
         _;
     }
 
@@ -89,6 +100,21 @@ contract FlightSuretyData {
         operational = mode;
     }
 
+    function authorizedCaller(address _address)
+    external
+    requireIsOperational
+    requireContractOwner 
+    {
+        authorizedCaller(_address) = true;
+    }
+
+    function deauthorizedCaller(address _address)
+    external
+    requireIsOperational
+    requireContractOwner 
+    {
+        delete authorizedCaller(_address);
+    }
     /********************************************************************************************/
     /*                                     SMART CONTRACT FUNCTIONS                             */
     /********************************************************************************************/
@@ -98,26 +124,246 @@ contract FlightSuretyData {
     *      Can only be called from FlightSuretyApp contract
     *
     */   
-    function registerAirline
+    mapping(address => Airline) private airlines;
+    uint256 private registeredAirlines = 0;
+
+    struct Airline{
+        AirlineStatus status;
+        address[] votes;
+        uint256 funds;
+    } 
+
+    enum AirlineStatus {Nominated, Registered, Funded}
+
+    function registeredAirlineCount
                             (   
                             )
                             external
-                            pure
+                            view
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (uint256)
     {
+        return registeredAirlines;
     }
 
+    function numberAirlineVotes
+                            (  
+                                address airlineAddress 
+                            )
+                            external
+                            view
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (uint256)
+    {
+        return airlines[airlineAddress].votes.length;
+    }
 
+    function amountAirlineFunds
+                            (  
+                                address airlineAddress 
+                            )
+                            external
+                            view
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (uint256)
+    {
+        return airlines[airlineAddress].funds;
+    }
+
+    function isAirlineNominated
+                            (  
+                                address airlineAddress 
+                            )
+                            external
+                            view
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (bool)
+    {
+        return airlines[airlineAddress].status == AirlineStatus.Nominated;
+    }
+
+    function isAirlineRegistered
+                            (  
+                                address airlineAddress 
+                            )
+                            external
+                            view
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (bool)
+    {
+        return airlines[airlineAddress].status == AirlineStatus.Funded;
+    }
+
+    function isAirlineFunded
+                            (  
+                                address airlineAddress 
+                            )
+                            external
+                            view
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (bool)
+    {
+        return airlines[airlineAddress].status == AirlineStatus.Funded;
+    }
+
+    function nominatedAirline
+                            (  
+                                address airlineAddress 
+                            )
+                            external
+                            requireIsOperational
+                            requireCallerAuthorized
+    {
+        airlines[airlineAddress] = Airline(
+            AirlineStatus.Nominated,
+            new address[](0),
+            0
+        );
+    }
+
+    function registerAirline
+                            (  
+                                address airlineAddress 
+                            )
+                            external
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (bool)
+    {
+        airlines[airlineAddress].status =AirlineStatus.Registered;
+        registeredAirlines++;
+        return airlines[airlineAddress].status == AirlineStatus.Registered;
+    }
+
+    function voteAirline
+                            (  
+                                address airlineAddress
+                                address voteAddress 
+                            )
+                            external
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (uint256)
+    {
+        airlines[airlineAddress].votes.push(voteAddress);
+        return airlines[airlineAddress].votes.length;
+    }
+
+    function fundAirline
+                            (  
+                                address airlineAddress
+                                uint256 fundingAmount 
+                            )
+                            external
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (uint256)
+    {
+        airlines[airlineAddress].funds += fundingAmount;
+        airlines[airlineAddress].status = AirlineStatus.Funded;
+        return airlines[airlineAddress].funds;
+    }
+
+    /**
+    * @dev Add an flight to the registration queue
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */  
+
+    struct Flight {
+        bool isRegistered;
+        address airline;
+        string flight;
+        uint256 departureTime;
+        uint8 statusCode;
+        address[] insuress;
+    }
+
+    mapping(bytes32 => Flight) private flights;
+
+    function registerFlight
+                            (
+                                address airline,
+                                string flight,
+                                uint256 departureTime,
+                                uint8 statusCode                             
+                            )
+                            external
+                            requireIsOperational
+                            requireCallerAuthorized
+    {
+        bytes32 key = getFlightKey(airline, flight, departureTime);
+        Flighht memory newFlight;
+        newFlight.isRegistered = true;
+        newFlight.airline = airline;
+        newFlight.flight = flight;
+        newFlight.departureTime = departureTime;
+        newFlight.statusCode = statusCode;
+        flights[key] = newFlight;
+    }
+
+    function updateFlightStatus
+                            (  
+                                uint8 statusCode,
+                                bytes32 flightKey                           
+                            )
+                            external 
+                            requireIsOperational
+                            requireCallerAuthorized
+    {
+        flights[flightKey].statusCode = statusCode;
+    }
+
+    function isFlightRegistered
+                            (  
+                                bytes32 flightKey                           
+                            )
+                            external
+                            view
+                            requireIsOperational
+                            requireCallerAuthorized
+                            returns (bool)
+    {
+        return flights[flightKey].isRegistered;
+    }
+
+    /**
+    * @dev Add an Insurance contract to the registration queue
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */  
+    
+    struct Insurance{
+        uint256 funds;
+        bool withdrawable;
+    }
+
+    mapping(address => Insurance) private insurance;
    /**
     * @dev Buy insurance for a flight
     *
     */   
     function buy
-                            (                             
+                            (
+                                address passengerAddress,
+                                insuranceAmount, 
+                                bytes32 flightKey                             
                             )
                             external
-                            payable
+                            requireIsOperational
+                            requireCallerAuthorized
     {
-
+        flights[flightKey].insurees.push(passengerAddress);
+        Insurance memory newInsurance;
+        newInsurance.funds = insuranceAmount;
+        newInsurance.withdrawable = false;
+        insurance[passengerAddress] = newInsurance; 
     }
 
     /**
@@ -125,10 +371,16 @@ contract FlightSuretyData {
     */
     function creditInsurees
                                 (
+                                    bytes32 flightKey
                                 )
                                 external
-                                pure
+                                requireIsOperational
+                                requireCallerAuthorized
     {
+        for(uint8 i = 0; i <= flights[flightKey].insurees.length; i++) {
+            address passengerAddress = flights[flightKey].insurees[i];
+            insurance[passengerAddress].withdrawable = true;
+        }
     }
     
 
