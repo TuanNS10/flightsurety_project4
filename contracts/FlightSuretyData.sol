@@ -11,6 +11,7 @@ contract FlightSuretyData {
 
     address private contractOwner;                                      // Account used to deploy contract
     bool private operational = true;
+
     mapping(address => bool) private authorizedCaller;                                    // Blocks all state changes throughout the contract if false
 
     /********************************************************************************************/
@@ -100,18 +101,24 @@ contract FlightSuretyData {
         operational = mode;
     }
 
-    function authorizedCaller(address _address)
-    external
-    requireIsOperational
-    requireContractOwner 
+    function authorizeCaller
+                            (
+                                address _address
+                            )
+                            external
+                            requireIsOperational
+                            requireContractOwner 
     {
         authorizedCaller(_address) = true;
     }
 
-    function deauthorizedCaller(address _address)
-    external
-    requireIsOperational
-    requireContractOwner 
+    function deauthorizeCaller
+                                (
+                                    address _address
+                                )
+                                external
+                                requireIsOperational
+                                requireContractOwner 
     {
         delete authorizedCaller(_address);
     }
@@ -135,6 +142,11 @@ contract FlightSuretyData {
 
     enum AirlineStatus {Nominated, Registered, Funded}
 
+    /**
+    * @dev Count Airline Register
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */  
     function registeredAirlineCount
                             (   
                             )
@@ -147,6 +159,11 @@ contract FlightSuretyData {
         return registeredAirlines;
     }
 
+     /**
+    * @dev Number Airline Votes
+    *      Can only be called from FlightSuretyApp contract
+    *
+    */
     function numberAirlineVotes
                             (  
                                 address airlineAddress 
@@ -243,7 +260,7 @@ contract FlightSuretyData {
 
     function voteAirline
                             (  
-                                address airlineAddress
+                                address airlineAddress,
                                 address voteAddress 
                             )
                             external
@@ -257,7 +274,7 @@ contract FlightSuretyData {
 
     function fundAirline
                             (  
-                                address airlineAddress
+                                address airlineAddress,
                                 uint256 fundingAmount 
                             )
                             external
@@ -299,7 +316,7 @@ contract FlightSuretyData {
                             requireCallerAuthorized
     {
         bytes32 key = getFlightKey(airline, flight, departureTime);
-        Flighht memory newFlight;
+        Flight memory newFlight;
         newFlight.isRegistered = true;
         newFlight.airline = airline;
         newFlight.flight = flight;
@@ -352,14 +369,14 @@ contract FlightSuretyData {
     function buy
                             (
                                 address passengerAddress,
-                                insuranceAmount, 
+                                uint256 insuranceAmount, 
                                 bytes32 flightKey                             
                             )
                             external
                             requireIsOperational
                             requireCallerAuthorized
     {
-        flights[flightKey].insurees.push(passengerAddress);
+        flights[flightKey].insurance.push(passengerAddress);
         Insurance memory newInsurance;
         newInsurance.funds = insuranceAmount;
         newInsurance.withdrawable = false;

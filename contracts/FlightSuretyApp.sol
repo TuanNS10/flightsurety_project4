@@ -7,7 +7,7 @@ pragma solidity ^0.4.25;
 import "../node_modules/openzeppelin-solidity/contracts/math/SafeMath.sol";
 
 // Import the contract data
-import "./FlightSuretyData";
+import "./FlightSuretyData.sol";
 
 /************************************************** */
 /* FlightSurety Smart Contract                      */
@@ -169,7 +169,7 @@ contract FlightSuretyApp {
                             external
                             requireFundedAirlineCaller
                             requireNotRegistered(airlineAddress)
-                            reuireNotFunded(airlineAddress)
+                            requireNotFunded(airlineAddress)
                             returns(bool success, uint256 votes)
     {
         if(!flightData.isAirlineNominated(airlineAddress)){
@@ -285,7 +285,7 @@ contract FlightSuretyApp {
                                 (
                                     address airline,
                                     string memory flight,
-                                    uint256 timestamp,
+                                    uint256 departureTime,
                                     uint8 statusCode
                                 )
                                 internal
@@ -315,15 +315,15 @@ contract FlightSuretyApp {
                                 (
                                     address airline,
                                     string flight,
-                                    uint256 departureTime,
+                                    uint256 departureTime
                                 )
                                 public
                                 payable
                                 rejectOverpayment
     {
         bytes32 key = getFlightKey(airline, flight, departureTime);
-        flightData.buyInsurance(msg.sender, msg.value, key);
-        emit InsurancePurchased(msg.sender, msg.value);
+        flightData.buy(msg.sender, msg.value, key);
+        emit Insurancepurchased(msg.sender, msg.value);
     }
     // Generate a request for oracles to fetch flight information
     function fetchFlightStatus
